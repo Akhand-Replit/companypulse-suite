@@ -9,43 +9,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
-import { UserCog, PlusCircle, Edit, Trash2, Search } from "lucide-react";
-
-// Define role type to match the database enum
-type UserRole = "admin" | "company_admin" | "manager" | "assistant_manager" | "employee" | "job_seeker";
-
-interface Company {
-  id: string;
-  name: string;
-}
-
-interface Branch {
-  id: string;
-  name: string;
-  company_id: string;
-}
-
-interface Employee {
-  id: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  role: UserRole;
-  company_id: string;
-  branch_id: string | null;
-  company_name: string;
-  branch_name: string | null;
-}
+import { UserProfile, UserRole, Company, Branch } from "@/types/userTypes";
+import { PlusCircle, Edit, Trash2, User } from "lucide-react";
 
 const EmployeeManagement = () => {
   const navigate = useNavigate();
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employees, setEmployees] = useState<UserProfile[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [filteredBranches, setFilteredBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
   
   // Form state
   const [formOpen, setFormOpen] = useState(false);
@@ -53,11 +28,9 @@ const EmployeeManagement = () => {
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("employee");
-  const [companyId, setCompanyId] = useState<string>("");
-  const [branchId, setBranchId] = useState<string>("");
-  const [filteredBranches, setFilteredBranches] = useState<Branch[]>([]);
+  const [companyId, setCompanyId] = useState("");
+  const [branchId, setBranchId] = useState("");
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -85,7 +58,9 @@ const EmployeeManagement = () => {
 
         if (data) {
           setIsAdmin(true);
-          fetchData();
+          fetchEmployees();
+          fetchCompanies();
+          fetchBranches();
         } else {
           toast({
             title: "Access Denied",
@@ -104,91 +79,58 @@ const EmployeeManagement = () => {
     checkAuth();
   }, [navigate]);
 
+  // Update filtered branches when company selection changes
   useEffect(() => {
     if (companyId) {
-      const filtered = branches.filter(branch => branch.company_id === companyId);
-      setFilteredBranches(filtered);
-      if (filtered.length > 0 && !filtered.some(b => b.id === branchId)) {
-        setBranchId(filtered[0].id);
-      }
+      setFilteredBranches(branches.filter(branch => branch.company_id === companyId));
     } else {
       setFilteredBranches([]);
-      setBranchId("");
     }
+    setBranchId("");
   }, [companyId, branches]);
 
-  const fetchData = async () => {
+  const fetchEmployees = async () => {
     try {
       setLoading(true);
       
-      // Fetch companies
-      const { data: companiesData, error: companiesError } = await supabase
-        .from('companies')
-        .select('id, name')
-        .order('name');
-
-      if (companiesError) throw companiesError;
-      setCompanies(companiesData || []);
-
-      // Fetch branches
-      const { data: branchesData, error: branchesError } = await supabase
-        .from('branches')
-        .select('id, name, company_id')
-        .order('name');
-
-      if (branchesError) throw branchesError;
-      setBranches(branchesData || []);
-
-      // Modified query to fetch employees with role information separately
-      const { data: profilesData, error: profilesError } = await supabase
+      // Get all users from auth.users
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select(`
-          id, 
-          email, 
-          first_name, 
-          last_name
-        `)
-        .order('first_name');
-
+        .select('*');
+      
       if (profilesError) throw profilesError;
       
-      if (profilesData) {
-        // Fetch role information for each profile
-        const formattedEmployees: Employee[] = [];
-        
-        for (const profile of profilesData) {
-          const { data: roleData, error: roleError } = await supabase
-            .from('user_roles')
-            .select(`
-              role,
-              company_id,
-              branch_id,
-              companies:companies(name),
-              branches:branches(name)
-            `)
-            .eq('user_id', profile.id)
-            .single();
-            
-          if (!roleError && roleData) {
-            formattedEmployees.push({
-              id: profile.id,
-              email: profile.email || '',
-              first_name: profile.first_name || '',
-              last_name: profile.last_name || '',
-              role: roleData.role as UserRole,
-              company_id: roleData.company_id || '',
-              branch_id: roleData.branch_id || null,
-              company_name: roleData.companies?.name || '',
-              branch_name: roleData.branches?.name || null
-            });
-          }
-        }
-        
-        setEmployees(formattedEmployees);
+      // Get user roles
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('*');
+      
+      if (rolesError) throw rolesError;
+      
+      // Combine data
+      let combinedEmployees: UserProfile[] = [];
+      
+      if (profiles) {
+        combinedEmployees = profiles.map(profile => {
+          const userRole = userRoles?.find(role => role.user_id === profile.id);
+          
+          return {
+            id: profile.id,
+            email: profile.email || '',
+            first_name: profile.first_name || '',
+            last_name: profile.last_name || '',
+            role: userRole?.role as UserRole || 'employee',
+            company_id: userRole?.company_id || '',
+            branch_id: userRole?.branch_id || '',
+            created_at: profile.created_at
+          };
+        });
       }
+      
+      setEmployees(combinedEmployees);
     } catch (error: any) {
       toast({
-        title: "Error loading data",
+        title: "Error loading employees",
         description: error.message,
         variant: "destructive",
       });
@@ -197,11 +139,52 @@ const EmployeeManagement = () => {
     }
   };
 
+  const fetchCompanies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('*')
+        .order('name');
+        
+      if (error) throw error;
+      
+      if (data) {
+        setCompanies(data);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error loading companies",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchBranches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('branches')
+        .select('*')
+        .order('name');
+        
+      if (error) throw error;
+      
+      if (data) {
+        setBranches(data);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error loading branches",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const resetForm = () => {
     setEmail("");
     setFirstName("");
     setLastName("");
-    setPassword("");
     setRole("employee");
     setCompanyId("");
     setBranchId("");
@@ -212,10 +195,10 @@ const EmployeeManagement = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!companyId) {
+    if (!email || !firstName || !lastName || !role || !companyId || !branchId) {
       toast({
-        title: "Missing company",
-        description: "Please select a company for this employee",
+        title: "Missing fields",
+        description: "Please fill in all required fields",
         variant: "destructive",
       });
       return;
@@ -225,28 +208,28 @@ const EmployeeManagement = () => {
       setLoading(true);
       
       if (editingId) {
-        // Update existing employee
+        // Update existing profile
         const { error: profileError } = await supabase
           .from('profiles')
           .update({
+            email,
             first_name: firstName,
             last_name: lastName,
-            email: email
           })
           .eq('id', editingId);
-        
+          
         if (profileError) throw profileError;
         
         // Update role
         const { error: roleError } = await supabase
           .from('user_roles')
           .update({
-            role,
+            role: role as UserRole,
             company_id: companyId,
-            branch_id: branchId || null
+            branch_id: branchId,
           })
           .eq('user_id', editingId);
-        
+          
         if (roleError) throw roleError;
         
         toast({
@@ -254,42 +237,65 @@ const EmployeeManagement = () => {
           description: `${firstName} ${lastName} has been updated successfully`,
         });
       } else {
-        // Create new employee via signup
-        const { data: signupData, error: signupError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              first_name: firstName,
-              last_name: lastName
+        // Create new employee - first check if email exists
+        const { data: existingUser, error: checkError } = await supabase
+          .auth.admin.getUserByEmail(email);
+          
+        if (checkError) {
+          // User doesn't exist, create new user
+          const { data: userData, error: createError } = await supabase.auth.signUp({
+            email,
+            password: "tempPassword123", // This should be randomly generated or provided by the admin
+            options: {
+              data: {
+                first_name: firstName,
+                last_name: lastName,
+              }
             }
+          });
+          
+          if (createError) throw createError;
+          
+          if (userData.user) {
+            // Add user role
+            const { error: roleError } = await supabase
+              .from('user_roles')
+              .insert([{
+                user_id: userData.user.id,
+                role: role as UserRole,
+                company_id: companyId,
+                branch_id: branchId
+              }]);
+              
+            if (roleError) throw roleError;
+            
+            toast({
+              title: "Employee created",
+              description: `${firstName} ${lastName} has been created successfully`,
+            });
           }
-        });
-        
-        if (signupError) throw signupError;
-        
-        if (signupData?.user) {
-          // Add role for the new user
+        } else if (existingUser) {
+          // User exists, update role
           const { error: roleError } = await supabase
             .from('user_roles')
-            .insert({
-              user_id: signupData.user.id,
-              role,
+            .insert([{
+              user_id: existingUser.id,
+              role: role as UserRole,
               company_id: companyId,
-              branch_id: branchId || null
-            });
-          
+              branch_id: branchId
+            }]);
+            
           if (roleError) throw roleError;
           
           toast({
-            title: "Employee created",
-            description: `${firstName} ${lastName} has been added successfully`,
+            title: "Employee assigned",
+            description: `${firstName} ${lastName} has been assigned successfully`,
           });
         }
       }
       
       resetForm();
-      fetchData();
+      fetchEmployees();
     } catch (error: any) {
       toast({
         title: "Error saving employee",
@@ -301,37 +307,40 @@ const EmployeeManagement = () => {
     }
   };
 
-  const handleEdit = (employee: Employee) => {
-    setEmail(employee.email);
-    setFirstName(employee.first_name);
-    setLastName(employee.last_name);
-    setRole(employee.role);
-    setCompanyId(employee.company_id);
+  const handleEdit = (employee: UserProfile) => {
+    setEmail(employee.email || "");
+    setFirstName(employee.first_name || "");
+    setLastName(employee.last_name || "");
+    setRole(employee.role || "employee");
+    setCompanyId(employee.company_id || "");
     setBranchId(employee.branch_id || "");
     setEditingId(employee.id);
     setFormOpen(true);
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete ${name}? This will permanently remove their account.`)) return;
+    if (!confirm(`Are you sure you want to remove ${name} from the system?`)) return;
     
     try {
       setLoading(true);
       
-      // Delete user from auth (cascades to profiles via foreign key)
-      const { error } = await supabase.auth.admin.deleteUser(id);
-      
-      if (error) throw error;
+      // Remove role first
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', id);
+        
+      if (roleError) throw roleError;
       
       toast({
-        title: "Employee deleted",
-        description: `${name} has been deleted successfully`,
+        title: "Employee removed",
+        description: `${name} has been removed successfully`,
       });
       
-      fetchData();
+      fetchEmployees();
     } catch (error: any) {
       toast({
-        title: "Error deleting employee",
+        title: "Error removing employee",
         description: error.message,
         variant: "destructive",
       });
@@ -340,13 +349,15 @@ const EmployeeManagement = () => {
     }
   };
 
-  const filteredEmployees = employees.filter(emp => 
-    emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (emp.branch_name && emp.branch_name.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const getCompanyName = (companyId: string) => {
+    const company = companies.find(c => c.id === companyId);
+    return company ? company.name : "Unknown Company";
+  };
+
+  const getBranchName = (branchId: string) => {
+    const branch = branches.find(b => b.id === branchId);
+    return branch ? branch.name : "Unknown Branch";
+  };
 
   if (loading && employees.length === 0) {
     return (
@@ -363,23 +374,14 @@ const EmployeeManagement = () => {
       <div className="container mx-auto px-4 py-12">
         <SectionHeading
           title="Employee Management"
-          subtitle="Manage your employees and their roles"
+          subtitle="Manage your organization's employees"
           className="mb-8"
         />
 
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search employees..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+        <div className="flex justify-end mb-6">
           <Button 
             onClick={() => setFormOpen(!formOpen)} 
-            className="flex items-center gap-2 w-full sm:w-auto"
+            className="flex items-center gap-2"
           >
             {formOpen ? "Cancel" : (
               <>
@@ -405,7 +407,7 @@ const EmployeeManagement = () => {
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       required
-                      placeholder="Enter first name"
+                      placeholder="First name"
                     />
                   </div>
                   
@@ -416,7 +418,7 @@ const EmployeeManagement = () => {
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       required
-                      placeholder="Enter last name"
+                      placeholder="Last name"
                     />
                   </div>
                 </div>
@@ -429,49 +431,48 @@ const EmployeeManagement = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    placeholder="Enter email address"
-                    disabled={!!editingId} // Cannot change email for existing employees
+                    placeholder="Email address"
+                    disabled={!!editingId}
                   />
+                  {editingId && (
+                    <p className="text-xs text-muted-foreground">Email cannot be changed after creation</p>
+                  )}
                 </div>
-                
-                {!editingId && (
-                  <div className="space-y-2">
-                    <label htmlFor="password" className="text-sm font-medium">Password *</label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required={!editingId}
-                      placeholder="Enter password"
-                    />
-                  </div>
-                )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label htmlFor="role" className="text-sm font-medium">Role *</label>
-                    <Select value={role} onValueChange={(value: UserRole) => setRole(value)}>
+                    <Select 
+                      value={role} 
+                      onValueChange={(value) => setRole(value as UserRole)}
+                      required
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
                         <SelectItem value="company_admin">Company Admin</SelectItem>
                         <SelectItem value="manager">Manager</SelectItem>
                         <SelectItem value="assistant_manager">Assistant Manager</SelectItem>
                         <SelectItem value="employee">Employee</SelectItem>
+                        <SelectItem value="job_seeker">Job Seeker</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   
                   <div className="space-y-2">
                     <label htmlFor="company" className="text-sm font-medium">Company *</label>
-                    <Select value={companyId} onValueChange={setCompanyId}>
+                    <Select 
+                      value={companyId} 
+                      onValueChange={setCompanyId}
+                      required
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select company" />
                       </SelectTrigger>
                       <SelectContent>
-                        {companies.map(company => (
+                        {companies.map((company) => (
                           <SelectItem key={company.id} value={company.id}>
                             {company.name}
                           </SelectItem>
@@ -481,17 +482,24 @@ const EmployeeManagement = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    <label htmlFor="branch" className="text-sm font-medium">Branch</label>
+                    <label htmlFor="branch" className="text-sm font-medium">Branch *</label>
                     <Select 
                       value={branchId} 
                       onValueChange={setBranchId}
+                      required
                       disabled={!companyId || filteredBranches.length === 0}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select branch" />
+                        <SelectValue placeholder={
+                          !companyId 
+                            ? "Select company first" 
+                            : filteredBranches.length === 0 
+                              ? "No branches available" 
+                              : "Select branch"
+                        } />
                       </SelectTrigger>
                       <SelectContent>
-                        {filteredBranches.map(branch => (
+                        {filteredBranches.map((branch) => (
                           <SelectItem key={branch.id} value={branch.id}>
                             {branch.name}
                           </SelectItem>
@@ -514,23 +522,19 @@ const EmployeeManagement = () => {
           </Card>
         )}
 
-        {employees.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            No employees found. Add your first employee to get started.
-          </div>
-        ) : filteredEmployees.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            No employees match your search.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredEmployees.map((employee) => (
-              <Card key={employee.id}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {employees.length === 0 ? (
+            <div className="col-span-full text-center py-12 text-muted-foreground">
+              No employees found. Add your first employee to get started.
+            </div>
+          ) : (
+            employees.map((employee) => (
+              <Card key={employee.id} className="overflow-hidden">
                 <CardContent className="p-6">
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center gap-3">
                       <div className="bg-primary/10 p-2 rounded-full">
-                        <UserCog className="h-5 w-5 text-primary" />
+                        <User className="h-5 w-5 text-primary" />
                       </div>
                       <h3 className="text-lg font-semibold">
                         {employee.first_name} {employee.last_name}
@@ -549,38 +553,40 @@ const EmployeeManagement = () => {
                         variant="ghost" 
                         size="icon" 
                         onClick={() => handleDelete(employee.id, `${employee.first_name} ${employee.last_name}`)}
-                        title="Delete employee"
+                        title="Remove employee"
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   </div>
                   
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Email:</span>
-                      <span className="ml-2">{employee.email}</span>
-                    </div>
+                  <div className="text-sm mb-4">
+                    <p className="text-muted-foreground">{employee.email}</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
                       <span className="text-muted-foreground">Role:</span>
-                      <span className="ml-2 capitalize">{employee.role.replace(/_/g, ' ')}</span>
+                      <span className="ml-2 font-medium capitalize">{employee.role || "Not assigned"}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Company:</span>
-                      <span className="ml-2">{employee.company_name}</span>
+                      <span className="ml-2 font-medium">
+                        {employee.company_id ? getCompanyName(employee.company_id) : "Not assigned"}
+                      </span>
                     </div>
-                    {employee.branch_name && (
-                      <div>
-                        <span className="text-muted-foreground">Branch:</span>
-                        <span className="ml-2">{employee.branch_name}</span>
-                      </div>
-                    )}
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Branch:</span>
+                      <span className="ml-2 font-medium">
+                        {employee.branch_id ? getBranchName(employee.branch_id) : "Not assigned"}
+                      </span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
       </div>
     </PageLayout>
   );

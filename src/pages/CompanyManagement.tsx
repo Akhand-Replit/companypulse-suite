@@ -10,18 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
-import { Building, PlusCircle, Edit, Trash2 } from "lucide-react";
-
-interface Company {
-  id: string;
-  name: string;
-  description: string | null;
-  subscription_type: string;
-  branches_limit: number;
-  employees_limit: number;
-  active: boolean;
-  created_at: string;
-}
+import { Building, PlusCircle, Edit, Trash2, Map } from "lucide-react";
+import { Company } from "@/types/userTypes";
 
 const CompanyManagement = () => {
   const navigate = useNavigate();
@@ -212,6 +202,10 @@ const CompanyManagement = () => {
     }
   };
 
+  const navigateToBranches = (companyId: string, companyName: string) => {
+    navigate(`/branches?companyId=${companyId}`);
+  };
+
   if (loading) {
     return (
       <PageLayout>
@@ -350,6 +344,14 @@ const CompanyManagement = () => {
                       <Button 
                         variant="ghost" 
                         size="icon" 
+                        onClick={() => navigateToBranches(company.id, company.name)}
+                        title="Manage branches"
+                      >
+                        <Map className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
                         onClick={() => handleEdit(company)}
                         title="Edit company"
                       >
@@ -391,6 +393,17 @@ const CompanyManagement = () => {
                         {company.active ? 'Active' : 'Inactive'}
                       </span>
                     </div>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-border flex space-x-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => navigateToBranches(company.id, company.name)}
+                    >
+                      Manage Branches
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

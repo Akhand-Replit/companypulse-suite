@@ -14,6 +14,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import CompanyManagement from "./pages/CompanyManagement";
 import EmployeeManagement from "./pages/EmployeeManagement";
+import BranchManagement from "./pages/BranchManagement";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/company" element={<CompanyManagement />} />
           <Route path="/employees" element={<EmployeeManagement />} />
+          <Route path="/branches" element={<BranchManagement />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
