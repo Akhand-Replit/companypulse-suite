@@ -12,27 +12,51 @@ export type Database = {
       branches: {
         Row: {
           active: boolean | null
+          address: string | null
+          city: string | null
           company_id: string
+          country: string | null
           created_at: string | null
+          email: string | null
           id: string
+          is_headquarters: boolean | null
           name: string
+          phone: string | null
+          state: string | null
           updated_at: string | null
+          zip_code: string | null
         }
         Insert: {
           active?: boolean | null
+          address?: string | null
+          city?: string | null
           company_id: string
+          country?: string | null
           created_at?: string | null
+          email?: string | null
           id?: string
+          is_headquarters?: boolean | null
           name: string
+          phone?: string | null
+          state?: string | null
           updated_at?: string | null
+          zip_code?: string | null
         }
         Update: {
           active?: boolean | null
+          address?: string | null
+          city?: string | null
           company_id?: string
+          country?: string | null
           created_at?: string | null
+          email?: string | null
           id?: string
+          is_headquarters?: boolean | null
           name?: string
+          phone?: string | null
+          state?: string | null
           updated_at?: string | null
+          zip_code?: string | null
         }
         Relationships: [
           {
@@ -79,6 +103,66 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      daily_reports: {
+        Row: {
+          branch_id: string | null
+          challenges: string | null
+          company_id: string
+          created_at: string
+          date: string
+          hours_worked: number
+          id: string
+          plans_for_tomorrow: string | null
+          summary: string
+          tasks_completed: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          branch_id?: string | null
+          challenges?: string | null
+          company_id: string
+          created_at?: string
+          date: string
+          hours_worked: number
+          id?: string
+          plans_for_tomorrow?: string | null
+          summary: string
+          tasks_completed?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          branch_id?: string | null
+          challenges?: string | null
+          company_id?: string
+          created_at?: string
+          date?: string
+          hours_worked?: number
+          id?: string
+          plans_for_tomorrow?: string | null
+          summary?: string
+          tasks_completed?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_reports_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_reports_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       messages: {
         Row: {
@@ -139,6 +223,69 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      tasks: {
+        Row: {
+          assigned_by: string
+          assigned_to: string | null
+          branch_id: string | null
+          company_id: string
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          priority: string
+          recurring: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_by: string
+          assigned_to?: string | null
+          branch_id?: string | null
+          company_id: string
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority: string
+          recurring?: string | null
+          status: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_by?: string
+          assigned_to?: string | null
+          branch_id?: string | null
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string
+          recurring?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {

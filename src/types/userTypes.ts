@@ -24,6 +24,7 @@ export interface Company {
   employees_limit: number;
   active: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 export interface Branch {
@@ -38,7 +39,9 @@ export interface Branch {
   phone: string | null;
   email: string | null;
   is_headquarters: boolean;
+  active: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 export interface Task {
