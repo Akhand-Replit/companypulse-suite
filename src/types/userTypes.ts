@@ -63,6 +63,7 @@ export interface Task {
   created_at: string;
   updated_at: string;
   recurring?: TaskRecurring;
+  _deleteConfirmation?: boolean; // Add this property for UI state tracking
 }
 
 export interface DailyReport {

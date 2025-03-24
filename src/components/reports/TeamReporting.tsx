@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,10 +10,11 @@ import { format } from "date-fns";
 
 interface TeamReportingProps {
   user: UserProfile;
-  teamMembers: UserProfile[];
+  teamMembers?: UserProfile[];
+  isAdmin?: boolean;
 }
 
-export default function TeamReporting({ user, teamMembers }: TeamReportingProps) {
+export default function TeamReporting({ user, teamMembers = [], isAdmin = false }: TeamReportingProps) {
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMember, setSelectedMember] = useState<string>("");

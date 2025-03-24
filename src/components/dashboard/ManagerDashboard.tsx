@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { UserProfile, Task, DailyReport } from "@/types/userTypes";
@@ -62,39 +61,43 @@ export default function ManagerDashboard({ user }: ManagerDashboardProps) {
           setTeamMembers(userProfiles);
         }
         
-        // Fetch task statistics
-        const { data: tasksData, error: tasksError } = await supabase
+        // Fetch task statistics using separate queries for each status
+        const pendingTasks = await supabase
           .from("tasks")
-          .select("status, count(*)")
+          .select("id")
           .eq("branch_id", user.branch_id)
-          .eq("status", "pending")
-          .or("status.eq.in_progress,status.eq.completed,status.eq.cancelled");
-
-        if (tasksError) throw tasksError;
-        
-        // Since we can't use group, let's calculate counts manually
-        const taskCounts = {
-          'pending': 0,
-          'in_progress': 0,
-          'completed': 0,
-          'cancelled': 0
-        };
-        
-        // Count tasks by status
-        if (tasksData) {
-          for (const task of tasksData) {
-            if (task.status in taskCounts) {
-              taskCounts[task.status as keyof typeof taskCounts]++;
-            }
-          }
-        }
+          .eq("status", "pending");
+          
+        const inProgressTasks = await supabase
+          .from("tasks")
+          .select("id")
+          .eq("branch_id", user.branch_id)
+          .eq("status", "in_progress");
+          
+        const completedTasks = await supabase
+          .from("tasks")
+          .select("id")
+          .eq("branch_id", user.branch_id)
+          .eq("status", "completed");
+          
+        const cancelledTasks = await supabase
+          .from("tasks")
+          .select("id")
+          .eq("branch_id", user.branch_id)
+          .eq("status", "cancelled");
+          
+        // Calculate counts safely
+        const pendingCount = pendingTasks.data ? pendingTasks.data.length : 0;
+        const inProgressCount = inProgressTasks.data ? inProgressTasks.data.length : 0;
+        const completedCount = completedTasks.data ? completedTasks.data.length : 0;
+        const cancelledCount = cancelledTasks.data ? cancelledTasks.data.length : 0;
         
         // Format for chart
         const formattedTaskStats = [
-          { name: 'Pending', count: taskCounts['pending'] },
-          { name: 'In Progress', count: taskCounts['in_progress'] },
-          { name: 'Completed', count: taskCounts['completed'] },
-          { name: 'Cancelled', count: taskCounts['cancelled'] }
+          { name: 'Pending', count: pendingCount },
+          { name: 'In Progress', count: inProgressCount },
+          { name: 'Completed', count: completedCount },
+          { name: 'Cancelled', count: cancelledCount }
         ];
         
         setTaskStats(formattedTaskStats);
