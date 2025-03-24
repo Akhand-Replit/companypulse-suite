@@ -11,6 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/components/ui/use-toast";
 import { UserCog, PlusCircle, Edit, Trash2, Search } from "lucide-react";
 
+// Define role type to match the database enum
+type UserRole = "admin" | "company_admin" | "manager" | "assistant_manager" | "employee" | "job_seeker";
+
 interface Company {
   id: string;
   name: string;
@@ -27,7 +30,7 @@ interface Employee {
   email: string;
   first_name: string;
   last_name: string;
-  role: string;
+  role: UserRole;
   company_id: string;
   branch_id: string | null;
   company_name: string;
@@ -51,7 +54,7 @@ const EmployeeManagement = () => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("employee");
+  const [role, setRole] = useState<UserRole>("employee");
   const [companyId, setCompanyId] = useState<string>("");
   const [branchId, setBranchId] = useState<string>("");
   const [filteredBranches, setFilteredBranches] = useState<Branch[]>([]);
@@ -136,38 +139,50 @@ const EmployeeManagement = () => {
       if (branchesError) throw branchesError;
       setBranches(branchesData || []);
 
-      // Fetch employees with their roles and company/branch info
-      const { data: employeesData, error: employeesError } = await supabase
+      // Modified query to fetch employees with role information separately
+      const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select(`
           id, 
           email, 
           first_name, 
-          last_name,
-          user_roles!inner (
-            role,
-            company_id,
-            branch_id,
-            companies:company_id (name),
-            branches:branch_id (name)
-          )
+          last_name
         `)
         .order('first_name');
 
-      if (employeesError) throw employeesError;
+      if (profilesError) throw profilesError;
       
-      if (employeesData) {
-        const formattedEmployees = employeesData.map(emp => ({
-          id: emp.id,
-          email: emp.email || '',
-          first_name: emp.first_name || '',
-          last_name: emp.last_name || '',
-          role: emp.user_roles.role || '',
-          company_id: emp.user_roles.company_id || '',
-          branch_id: emp.user_roles.branch_id || null,
-          company_name: emp.user_roles.companies?.name || '',
-          branch_name: emp.user_roles.branches?.name || null
-        }));
+      if (profilesData) {
+        // Fetch role information for each profile
+        const formattedEmployees: Employee[] = [];
+        
+        for (const profile of profilesData) {
+          const { data: roleData, error: roleError } = await supabase
+            .from('user_roles')
+            .select(`
+              role,
+              company_id,
+              branch_id,
+              companies:companies(name),
+              branches:branches(name)
+            `)
+            .eq('user_id', profile.id)
+            .single();
+            
+          if (!roleError && roleData) {
+            formattedEmployees.push({
+              id: profile.id,
+              email: profile.email || '',
+              first_name: profile.first_name || '',
+              last_name: profile.last_name || '',
+              role: roleData.role as UserRole,
+              company_id: roleData.company_id || '',
+              branch_id: roleData.branch_id || null,
+              company_name: roleData.companies?.name || '',
+              branch_name: roleData.branches?.name || null
+            });
+          }
+        }
         
         setEmployees(formattedEmployees);
       }
@@ -230,8 +245,7 @@ const EmployeeManagement = () => {
             company_id: companyId,
             branch_id: branchId || null
           })
-          .eq('user_id', editingId)
-          .eq('role', role); // Target the specific role entry
+          .eq('user_id', editingId);
         
         if (roleError) throw roleError;
         
@@ -258,12 +272,12 @@ const EmployeeManagement = () => {
           // Add role for the new user
           const { error: roleError } = await supabase
             .from('user_roles')
-            .insert([{
+            .insert({
               user_id: signupData.user.id,
               role,
               company_id: companyId,
               branch_id: branchId || null
-            }]);
+            });
           
           if (roleError) throw roleError;
           
@@ -437,7 +451,7 @@ const EmployeeManagement = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label htmlFor="role" className="text-sm font-medium">Role *</label>
-                    <Select value={role} onValueChange={setRole}>
+                    <Select value={role} onValueChange={(value: UserRole) => setRole(value)}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
