@@ -40,3 +40,43 @@ export interface Branch {
   is_headquarters: boolean;
   created_at: string;
 }
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string | null;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  due_date: string | null;
+  assigned_to: string | null;
+  assigned_by: string;
+  company_id: string;
+  branch_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DailyReport {
+  id: string;
+  user_id: string;
+  company_id: string;
+  branch_id: string | null;
+  date: string;
+  summary: string;
+  hours_worked: number;
+  tasks_completed: string[] | null;
+  challenges: string | null;
+  plans_for_tomorrow: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Message {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  content: string;
+  read: boolean;
+  created_at: string;
+  updated_at: string;
+}
