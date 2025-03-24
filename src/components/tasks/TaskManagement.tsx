@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,7 +48,9 @@ export default function TaskManagement({ user, isManager = false, isAdmin = fals
       const { data, error } = await query;
       
       if (error) throw error;
-      setTasks(data || []);
+      
+      // Type assertion to ensure compatibility with Task interface
+      setTasks((data || []) as Task[]);
     } catch (error) {
       console.error("Error fetching tasks:", error);
       toast({

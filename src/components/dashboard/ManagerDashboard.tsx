@@ -26,61 +26,76 @@ export default function ManagerDashboard({ user }: ManagerDashboardProps) {
       try {
         if (!user.branch_id) return;
         
-        // Fetch team members
-        const { data: teamData, error: teamError } = await supabase
+        // Fetch team members - modified to use separate queries
+        const { data: teamRoles, error: teamError } = await supabase
           .from("user_roles")
-          .select(`
-            user_id,
-            role,
-            profiles:user_id(
-              id,
-              first_name,
-              last_name,
-              email
-            )
-          `)
+          .select("user_id, role")
           .eq("branch_id", user.branch_id)
           .eq("role", "employee");
 
         if (teamError) throw teamError;
         
-        // Transform data for easier use
-        const formattedTeamData = teamData.map(member => ({
-          id: member.profiles.id,
-          first_name: member.profiles.first_name,
-          last_name: member.profiles.last_name,
-          email: member.profiles.email,
-          role: member.role,
-          branch_id: user.branch_id,
-          company_id: user.company_id
-        }));
-        
-        setTeamMembers(formattedTeamData);
+        // For each user_id, fetch the profile data
+        if (teamRoles && teamRoles.length > 0) {
+          const userProfiles: UserProfile[] = [];
+          
+          for (const role of teamRoles) {
+            const { data: profileData, error: profileError } = await supabase
+              .from("profiles")
+              .select("id, first_name, last_name, email")
+              .eq("id", role.user_id)
+              .single();
+              
+            if (!profileError && profileData) {
+              userProfiles.push({
+                id: profileData.id,
+                first_name: profileData.first_name,
+                last_name: profileData.last_name,
+                email: profileData.email,
+                role: role.role,
+                branch_id: user.branch_id,
+                company_id: user.company_id
+              });
+            }
+          }
+          
+          setTeamMembers(userProfiles);
+        }
         
         // Fetch task statistics
         const { data: tasksData, error: tasksError } = await supabase
           .from("tasks")
-          .select("status, count")
+          .select("status, count(*)")
           .eq("branch_id", user.branch_id)
-          .group("status");
+          .eq("status", "pending")
+          .or("status.eq.in_progress,status.eq.completed,status.eq.cancelled");
 
         if (tasksError) throw tasksError;
         
-        const formattedTaskStats = [
-          { name: 'Pending', count: 0 },
-          { name: 'In Progress', count: 0 },
-          { name: 'Completed', count: 0 },
-          { name: 'Cancelled', count: 0 }
-        ];
+        // Since we can't use group, let's calculate counts manually
+        const taskCounts = {
+          'pending': 0,
+          'in_progress': 0,
+          'completed': 0,
+          'cancelled': 0
+        };
         
-        tasksData.forEach(statItem => {
-          const index = formattedTaskStats.findIndex(item => 
-            item.name.toLowerCase().replace(' ', '_') === statItem.status
-          );
-          if (index !== -1) {
-            formattedTaskStats[index].count = statItem.count;
+        // Count tasks by status
+        if (tasksData) {
+          for (const task of tasksData) {
+            if (task.status in taskCounts) {
+              taskCounts[task.status as keyof typeof taskCounts]++;
+            }
           }
-        });
+        }
+        
+        // Format for chart
+        const formattedTaskStats = [
+          { name: 'Pending', count: taskCounts['pending'] },
+          { name: 'In Progress', count: taskCounts['in_progress'] },
+          { name: 'Completed', count: taskCounts['completed'] },
+          { name: 'Cancelled', count: taskCounts['cancelled'] }
+        ];
         
         setTaskStats(formattedTaskStats);
       } catch (error) {

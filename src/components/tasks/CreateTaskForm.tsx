@@ -44,18 +44,10 @@ export default function CreateTaskForm({
       try {
         setFetchingTeam(true);
         
+        // First get all user_roles for the team members we want to fetch
         let query = supabase
           .from("user_roles")
-          .select(`
-            user_id,
-            role,
-            profiles:user_id(
-              id,
-              first_name,
-              last_name,
-              email
-            )
-          `);
+          .select("user_id, role");
         
         // Filter based on role
         if (isAdmin) {
@@ -70,16 +62,30 @@ export default function CreateTaskForm({
         
         if (error) throw error;
         
-        // Transform data for easier use
-        const formattedTeamData = data.map(member => ({
-          id: member.profiles.id,
-          first_name: member.profiles.first_name,
-          last_name: member.profiles.last_name,
-          email: member.profiles.email,
-          role: member.role
-        }));
-        
-        setTeamMembers(formattedTeamData);
+        // Then get the profile information for each user
+        if (data && data.length > 0) {
+          const formattedTeamData: UserProfile[] = [];
+          
+          for (const userRole of data) {
+            const { data: profileData, error: profileError } = await supabase
+              .from("profiles")
+              .select("id, first_name, last_name, email")
+              .eq("id", userRole.user_id)
+              .single();
+              
+            if (!profileError && profileData) {
+              formattedTeamData.push({
+                id: profileData.id,
+                first_name: profileData.first_name,
+                last_name: profileData.last_name,
+                email: profileData.email,
+                role: userRole.role
+              });
+            }
+          }
+          
+          setTeamMembers(formattedTeamData);
+        }
       } catch (error) {
         console.error("Error fetching team members:", error);
         toast({
@@ -122,7 +128,7 @@ export default function CreateTaskForm({
       const newTask = {
         title,
         description,
-        status: "pending",
+        status: "pending" as const,
         priority,
         due_date: date ? date.toISOString() : null,
         assigned_to: assignedTo,

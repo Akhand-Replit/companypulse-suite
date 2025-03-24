@@ -44,12 +44,17 @@ export interface Branch {
   updated_at: string;
 }
 
+// Allow string as status to accommodate database values, but ensure our code uses the correct enum values
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'delete_confirmation' | string;
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent' | string;
+export type TaskRecurring = 'daily' | 'weekly' | 'monthly' | null | string;
+
 export interface Task {
   id: string;
   title: string;
   description: string | null;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
+  status: TaskStatus;
+  priority: TaskPriority;
   due_date: string | null;
   assigned_to: string | null;
   assigned_by: string;
@@ -57,7 +62,7 @@ export interface Task {
   branch_id: string | null;
   created_at: string;
   updated_at: string;
-  recurring?: 'daily' | 'weekly' | 'monthly' | null;
+  recurring?: TaskRecurring;
 }
 
 export interface DailyReport {

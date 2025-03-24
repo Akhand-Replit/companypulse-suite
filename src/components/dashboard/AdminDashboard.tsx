@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { UserProfile, Company, Branch } from "@/types/userTypes";
@@ -46,21 +45,29 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         if (branchesError) throw branchesError;
         setBranches(branchesData);
         
-        // Fetch employee statistics by role
+        // Update the role statistics fetching logic
         const { data: roleStats, error: roleStatsError } = await supabase
           .from("user_roles")
-          .select("role, count")
-          .eq("company_id", user.company_id)
-          .group("role");
-
+          .select("role");
+          
         if (roleStatsError) throw roleStatsError;
         
-        const formattedRoleStats = roleStats.map(stat => ({
-          name: stat.role.replace('_', ' '),
-          value: stat.count
-        }));
-        
-        setEmployeeStats(formattedRoleStats);
+        if (roleStats) {
+          // Count roles manually
+          const roleCounts: Record<string, number> = {};
+          roleStats.forEach(item => {
+            const role = item.role;
+            roleCounts[role] = (roleCounts[role] || 0) + 1;
+          });
+          
+          // Format for chart
+          const formattedRoleStats = Object.entries(roleCounts).map(([role, count]) => ({
+            name: role.replace('_', ' '),
+            value: count
+          }));
+          
+          setEmployeeStats(formattedRoleStats);
+        }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {

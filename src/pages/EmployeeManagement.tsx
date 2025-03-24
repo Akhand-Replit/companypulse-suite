@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,7 +21,6 @@ const EmployeeManagement = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   
-  // Form state
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [email, setEmail] = useState("");
@@ -48,7 +46,6 @@ const EmployeeManagement = () => {
           return;
         }
 
-        // Check if user is admin
         const { data, error } = await supabase
           .from('user_roles')
           .select('role')
@@ -79,7 +76,6 @@ const EmployeeManagement = () => {
     checkAuth();
   }, [navigate]);
 
-  // Update filtered branches when company selection changes
   useEffect(() => {
     if (companyId) {
       setFilteredBranches(branches.filter(branch => branch.company_id === companyId));
@@ -93,21 +89,18 @@ const EmployeeManagement = () => {
     try {
       setLoading(true);
       
-      // Get all users from auth.users
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*');
       
       if (profilesError) throw profilesError;
       
-      // Get user roles
       const { data: userRoles, error: rolesError } = await supabase
         .from('user_roles')
         .select('*');
       
       if (rolesError) throw rolesError;
       
-      // Combine data
       let combinedEmployees: UserProfile[] = [];
       
       if (profiles) {
@@ -122,7 +115,6 @@ const EmployeeManagement = () => {
             role: userRole?.role as UserRole || 'employee',
             company_id: userRole?.company_id || '',
             branch_id: userRole?.branch_id || '',
-            created_at: profile.created_at
           };
         });
       }
@@ -208,7 +200,6 @@ const EmployeeManagement = () => {
       setLoading(true);
       
       if (editingId) {
-        // Update existing profile
         const { error: profileError } = await supabase
           .from('profiles')
           .update({
@@ -220,7 +211,6 @@ const EmployeeManagement = () => {
           
         if (profileError) throw profileError;
         
-        // Update role
         const { error: roleError } = await supabase
           .from('user_roles')
           .update({
@@ -237,15 +227,19 @@ const EmployeeManagement = () => {
           description: `${firstName} ${lastName} has been updated successfully`,
         });
       } else {
-        // Create new employee - first check if email exists
-        const { data: existingUser, error: checkError } = await supabase
-          .auth.admin.getUserByEmail(email);
+        const { data: existingUsers, error: checkError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("email", email);
           
-        if (checkError) {
-          // User doesn't exist, create new user
+        if (checkError) throw checkError;
+        
+        const existingUser = existingUsers && existingUsers.length > 0 ? existingUsers[0] : null;
+          
+        if (!existingUser) {
           const { data: userData, error: createError } = await supabase.auth.signUp({
             email,
-            password: "tempPassword123", // This should be randomly generated or provided by the admin
+            password: "tempPassword123",
             options: {
               data: {
                 first_name: firstName,
@@ -257,7 +251,6 @@ const EmployeeManagement = () => {
           if (createError) throw createError;
           
           if (userData.user) {
-            // Add user role
             const { error: roleError } = await supabase
               .from('user_roles')
               .insert([{
@@ -275,7 +268,6 @@ const EmployeeManagement = () => {
             });
           }
         } else if (existingUser) {
-          // User exists, update role
           const { error: roleError } = await supabase
             .from('user_roles')
             .insert([{
@@ -324,7 +316,6 @@ const EmployeeManagement = () => {
     try {
       setLoading(true);
       
-      // Remove role first
       const { error: roleError } = await supabase
         .from('user_roles')
         .delete()

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { UserProfile, Task } from "@/types/userTypes";
@@ -49,7 +48,7 @@ export default function TaskList({
       if (error) throw error;
       
       if (data) {
-        onTaskUpdated(data);
+        onTaskUpdated(data as Task);
         toast({
           title: "Status Updated",
           description: `Task status changed to ${newStatus.replace('_', ' ')}`,
@@ -212,7 +211,11 @@ export default function TaskList({
                   <Button 
                     variant="destructive" 
                     size="sm"
-                    onClick={() => setSelectedTask({...task, status: 'delete_confirmation'})}
+                    onClick={() => {
+                      const taskWithDeleteFlag = {...task};
+                      setSelectedTask({...task, status: task.status});
+                      setSelectedTask({...task, _deleteConfirmation: true} as Task);
+                    }}
                   >
                     Delete
                   </Button>
@@ -223,9 +226,8 @@ export default function TaskList({
         </Card>
       ))}
       
-      {/* Update Status Dialog */}
       <Dialog 
-        open={selectedTask !== null && selectedTask.status !== 'delete_confirmation'} 
+        open={selectedTask !== null && !selectedTask._deleteConfirmation} 
         onOpenChange={(open) => !open && setSelectedTask(null)}
       >
         <DialogContent>
@@ -262,9 +264,8 @@ export default function TaskList({
         </DialogContent>
       </Dialog>
       
-      {/* Delete Confirmation Dialog */}
       <Dialog 
-        open={selectedTask !== null && selectedTask.status === 'delete_confirmation'} 
+        open={selectedTask !== null && selectedTask._deleteConfirmation} 
         onOpenChange={(open) => !open && setSelectedTask(null)}
       >
         <DialogContent>

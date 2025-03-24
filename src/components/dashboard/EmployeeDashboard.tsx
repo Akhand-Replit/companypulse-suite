@@ -29,7 +29,8 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
           .limit(5);
 
         if (tasksError) throw tasksError;
-        setRecentTasks(tasksData || []);
+        // Type assertion for Task compatibility
+        setRecentTasks((tasksData || []) as Task[]);
         
         // Fetch recent reports
         const { data: reportsData, error: reportsError } = await supabase
@@ -40,7 +41,8 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
           .limit(5);
 
         if (reportsError) throw reportsError;
-        setRecentReports(reportsData || []);
+        // Type assertion for DailyReport compatibility
+        setRecentReports((reportsData || []) as DailyReport[]);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
