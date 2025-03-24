@@ -54,6 +54,7 @@ export interface Task {
   branch_id: string | null;
   created_at: string;
   updated_at: string;
+  recurring?: 'daily' | 'weekly' | 'monthly' | null;
 }
 
 export interface DailyReport {

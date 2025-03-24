@@ -10,6 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import EmployeeDashboard from "@/components/dashboard/EmployeeDashboard";
 import ManagerDashboard from "@/components/dashboard/ManagerDashboard";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
+import ReportingDashboard from "@/components/reports/ReportingDashboard";
+import TaskManagement from "@/components/tasks/TaskManagement";
 
 export default function Dashboard() {
   const [user, setUser] = useState<UserProfile | null>(null);
