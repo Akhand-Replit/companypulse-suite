@@ -11,13 +11,26 @@ import { toast } from "@/components/ui/use-toast";
 const Index = () => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const checkUser = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        setIsAuthenticated(!!data.session);
+        const { data: { session } } = await supabase.auth.getSession();
+        setIsAuthenticated(!!session);
+        
+        if (session?.user) {
+          // Check if user is admin
+          const { data } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .eq('role', 'admin')
+            .single();
+            
+          setIsAdmin(!!data);
+        }
       } catch (error) {
         console.error("Error checking authentication:", error);
         toast({
@@ -33,8 +46,22 @@ const Index = () => {
     checkUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         setIsAuthenticated(!!session);
+        
+        if (session?.user) {
+          // Check if user is admin
+          const { data } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .eq('role', 'admin')
+            .single();
+            
+          setIsAdmin(!!data);
+        } else {
+          setIsAdmin(false);
+        }
       }
     );
 
@@ -63,12 +90,22 @@ const Index = () => {
               <Button 
                 onClick={() => 
                   isAuthenticated 
-                    ? navigate("/company") 
+                    ? isAdmin
+                      ? navigate("/company")
+                      : toast({
+                          title: "Access Restricted",
+                          description: "Only administrators can access company management",
+                          variant: "destructive"
+                        })
                     : navigate("/auth")
                 }
                 className="w-full"
               >
-                {isAuthenticated ? "Manage Company" : "Sign In to Access"}
+                {isAuthenticated 
+                  ? isAdmin
+                    ? "Manage Companies" 
+                    : "Admin Access Only"
+                  : "Sign In to Access"}
               </Button>
             </CardContent>
           </Card>
@@ -82,12 +119,22 @@ const Index = () => {
               <Button 
                 onClick={() => 
                   isAuthenticated 
-                    ? navigate("/employees") 
+                    ? isAdmin
+                      ? navigate("/employees")
+                      : toast({
+                          title: "Access Restricted",
+                          description: "Only administrators can access employee management",
+                          variant: "destructive"
+                        })
                     : navigate("/auth")
                 }
                 className="w-full"
               >
-                {isAuthenticated ? "Manage Employees" : "Sign In to Access"}
+                {isAuthenticated 
+                  ? isAdmin
+                    ? "Manage Employees" 
+                    : "Admin Access Only"
+                  : "Sign In to Access"}
               </Button>
             </CardContent>
           </Card>

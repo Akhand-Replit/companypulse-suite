@@ -1,9 +1,19 @@
 
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, X, User, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from '@/components/ui/use-toast';
 
 const navLinks = [
   { name: 'Home', href: '/' },
@@ -16,7 +26,11 @@ const navLinks = [
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -30,6 +44,69 @@ export default function Header() {
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+      setUser(session?.user || null);
+      
+      if (session?.user) {
+        // Check if user is admin
+        const { data } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .eq('role', 'admin')
+          .single();
+          
+        setIsAdmin(!!data);
+      }
+    };
+
+    checkUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setIsAuthenticated(!!session);
+        setUser(session?.user || null);
+        
+        if (session?.user) {
+          // Check if user is admin
+          const { data } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .eq('role', 'admin')
+            .single();
+            
+          setIsAdmin(!!data);
+        } else {
+          setIsAdmin(false);
+        }
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Signed out successfully"
+      });
+      navigate("/");
+    } catch (error: any) {
+      toast({
+        title: "Error signing out",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
 
   return (
     <header
@@ -65,14 +142,83 @@ export default function Header() {
                   </Link>
                 </li>
               ))}
+              
+              {isAdmin && (
+                <>
+                  <li>
+                    <Link
+                      to="/company"
+                      className={cn(
+                        'text-sm font-medium transition-colors relative py-2',
+                        'after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full',
+                        'after:origin-center after:scale-x-0 after:transition-transform after:duration-300',
+                        'hover:text-primary',
+                        location.pathname === "/company" 
+                          ? 'text-primary after:bg-primary after:scale-x-100' 
+                          : 'after:bg-primary/80'
+                      )}
+                    >
+                      Companies
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/employees"
+                      className={cn(
+                        'text-sm font-medium transition-colors relative py-2',
+                        'after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full',
+                        'after:origin-center after:scale-x-0 after:transition-transform after:duration-300',
+                        'hover:text-primary',
+                        location.pathname === "/employees" 
+                          ? 'text-primary after:bg-primary after:scale-x-100' 
+                          : 'after:bg-primary/80'
+                      )}
+                    >
+                      Employees
+                    </Link>
+                  </li>
+                </>
+              )}
             </ul>
             <div className="flex items-center space-x-4">
-              <Button variant="outline" asChild>
-                <Link to="/login">Log in</Link>
-              </Button>
-              <Button asChild>
-                <Link to="/register">Get Started</Link>
-              </Button>
+              {isAuthenticated ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Account
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {isAdmin && (
+                      <>
+                        <DropdownMenuItem asChild>
+                          <Link to="/company">Company Management</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to="/employees">Employee Management</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Logout</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <>
+                  <Button variant="outline" asChild>
+                    <Link to="/auth">Log in</Link>
+                  </Button>
+                  <Button asChild>
+                    <Link to="/auth?tab=signup">Get Started</Link>
+                  </Button>
+                </>
+              )}
             </div>
           </nav>
 
@@ -130,14 +276,52 @@ export default function Header() {
                     </Link>
                   </li>
                 ))}
+                
+                {isAdmin && (
+                  <>
+                    <li>
+                      <Link
+                        to="/company"
+                        className={cn(
+                          'block text-base font-medium py-2',
+                          location.pathname === "/company" ? 'text-primary' : ''
+                        )}
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Companies
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        to="/employees"
+                        className={cn(
+                          'block text-base font-medium py-2',
+                          location.pathname === "/employees" ? 'text-primary' : ''
+                        )}
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Employees
+                      </Link>
+                    </li>
+                  </>
+                )}
               </ul>
               <div className="flex flex-col space-y-4 pt-6 border-t">
-                <Button variant="outline" asChild>
-                  <Link to="/login">Log in</Link>
-                </Button>
-                <Button asChild>
-                  <Link to="/register">Get Started</Link>
-                </Button>
+                {isAuthenticated ? (
+                  <Button onClick={handleSignOut} variant="outline" className="flex justify-center items-center gap-2">
+                    <LogOut className="h-4 w-4" />
+                    Sign Out
+                  </Button>
+                ) : (
+                  <>
+                    <Button variant="outline" asChild>
+                      <Link to="/auth">Log in</Link>
+                    </Button>
+                    <Button asChild>
+                      <Link to="/auth?tab=signup">Get Started</Link>
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>
